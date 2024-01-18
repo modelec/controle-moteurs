@@ -24,7 +24,7 @@
 
 // parametre K
 // rotation
-#define KRap 1.3
+#define KRap 0.6
 #define KRai 0.4
 #define KRad 0
 // distance
@@ -36,6 +36,8 @@
 #define maxSpeed 200
 #define minSpeed 50
 #define maxAcc 10
+
+#define maxIdT maxSpeed / Kdi
 
 // compte codeur 
 long countR = 0;
@@ -220,6 +222,15 @@ void loop() {
     // recallage
     else if (cmd=='d'){
       IdT += dT;
+      if (IdT > maxIdT) {
+        IdT = maxIdT;
+      }
+      if (IdT < -maxIdT) {
+        IdT = -maxIdT;
+      }
+      if ((dT < 1) && (dT > -1)) {
+        IdT = 0;
+      }
       cmdV = Kdp * dT + Kdi * IdT + Kdd * dD;
       cmdR  = (int)(cmdV*maxAcc);
       //cmdR = dT * maxAcc;
@@ -242,7 +253,7 @@ void loop() {
       }
       
       IzT += zT;
-      if (abs(zT) > PI/20 ){
+      if (abs(zT) < PI/40 ){
           Ez = KRap * zT;
           IzT = 0;
       }else{
@@ -251,19 +262,6 @@ void loop() {
       cmdR -= (int)(Ez*abs(cmdR));
       cmdL += (int)(Ez*abs(cmdL));   
 
-      if (abs(cmdR)<minSpeed) {
-        cmdR = minSpeed;
-        if (cmdR<0) {
-          cmdR *= -1;
-        }
-      }
-      if (abs(cmdL)<minSpeed) {
-        cmdL = minSpeed;
-        if (cmdR<0) {
-          cmdL *= -1;
-        }
-      }
-
       prevCmdR = cmdR;
       prevCmdL = cmdL;
 
@@ -271,9 +269,8 @@ void loop() {
     }
 
     else if (cmd=='r'){
-      
       IzT += zT;
-      if (abs(zT) > PI/20 ){
+      if (abs(zT) < PI/40 ){
           cmdV = KRap * zT;
           IzT = 0;
       }else{
@@ -329,6 +326,7 @@ void decryptIncom(){
       dT = dT * 10 + streamChar[i] - '0';
       i++;
     }
+    if (neg) dT = -dT;
   }
   if (streamChar[i] == 'r'){
     i = 2;
