@@ -1,26 +1,26 @@
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 
 // pin
-#define interruptPinRA 2
-#define interruptPinRB 3
-#define interruptPinLA 19
-#define interruptPinLB 18
+#define interruptionPinDA 2
+#define interruptionPinDB 3
+#define interruptionPinGA 19
+#define interruptionPinGB 18
 
-#define pinMotorRA 5
-#define pinMotorRB 6
-#define pinMotorLA 7
-#define pinMotorLB 8
+#define moteurPinDA 5
+#define moteurPinDB 6
+#define moteurPinGA 7
+#define moteurPinGB 8
 
 // tick / mm
-#define tickcmR 4.211
-#define tickcmL 4.191
+#define tickmmD 4.211
+#define tickmmG 4.191
 
 //tick / rad horaire
-#define tickZR_N 644
-#define tickZL_P 633
+#define tickZD_N 641
+#define tickZG_P 628
 //tick / rad trigo
-#define tickZR_P 639
-#define tickZL_N 645
+#define tickZD_P 652
+#define tickZG_N 619
 
 // parametre K
 // rotation distance
@@ -34,7 +34,7 @@
 #define Kdi 0
 
 // correction gauche
-#define KL 10
+#define KG 10
 
 // vitesse max
 #define maxSpeed 270
@@ -44,7 +44,7 @@
 // String streamChar;
 char streamChar[32] ;
 int i;
-int incomingByte = 0; // for incoming serial data
+int octetArrivant = 0; // for incoming serial data
 // position du robot
 float X = 0;
 float Y = 0;
@@ -55,15 +55,15 @@ float Xt = 0;
 float Yt = 0;
 float Zt = 0;
 
-// compte codeur
-long countR = 0;
-long countL = 0;
-long prevCountR = 0;
-long prevCountL = 0;
+// compte codeur 
+long compteD = 0;
+long compteG = 0;
+long comptePrecD = 0;
+long comptePrecG = 0;
 
 // rampte de vitesse
 const float rankSpeed = 15;
-float cmdSpeed;
+float cmdVitesse;
 
 // precision de position a atteindre
 const float precisionPos = 5; //mm
@@ -71,15 +71,15 @@ const float precisionZ = PI/360; //0.5 deg
 
 float IEz, Idc;
 bool goBack = true;
-int rotSigne = 0;
-int loopCount;
+int signeRot = 0;
+int compteBoucle;
 char cmd;
-int cmdR,cmdL;
-int prevCmdR,prevCmdL;
+int cmdD,cmdG;
+int cmdPrecD,cmdPrecG;
 
 // chronometrage
 unsigned long interval = (unsigned long) 50;
-unsigned long previousMillis;
+unsigned long millisPrecedente;
 
 
 // PWM output @ 25 kHz, only on pins 2, 3, 5 and 6, 7, 8.
@@ -121,7 +121,7 @@ void analogWrite25k(int pin, int value) {
 
 void setup() {
   // put your setup code here, to run once:
-
+  
     // Configure Timer 3 for PWM @ 25 kHz.
   TCCR3A = 0;           // undo the configuration done by...
   TCCR3B = 0;           // ...the Arduino core library
@@ -146,24 +146,24 @@ void setup() {
   ICR4   = 320;         // TOP = 320
 
   Serial.begin(115200);  //Init the Serial baudrate
-
-  pinMode(interruptPinRA, INPUT_PULLUP);
-  pinMode(interruptPinRB, INPUT_PULLUP);
-  pinMode(interruptPinLA, INPUT_PULLUP);
-  pinMode(interruptPinLB, INPUT_PULLUP);
-
-  long countR = 0;
-  long countL = 0;
+  
+  pinMode(interruptionPinDA, INPUT_PULLUP);
+  pinMode(interruptionPinDB, INPUT_PULLUP);
+  pinMode(interruptionPinGA, INPUT_PULLUP);
+  pinMode(interruptionPinGB, INPUT_PULLUP);
+  
+  long countD = 0;
+  long countG = 0;
   float X = 0;
   float Y = 0;
   float Z = 0;
+  
+  cmdVitesse = 0;
 
-  cmdSpeed = 0;
-
-  attachInterrupt(digitalPinToInterrupt(interruptPinRA), interruptR, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(interruptPinLA), interruptL, CHANGE);
-
-  previousMillis = millis();
+  attachInterrupt(digitalPinToInterrupt(interruptionPinDA), interruptD, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(interruptionPinGA), interruptG, CHANGE);
+  
+  millisPrecedente = millis();
 }
 
 void loop() {
@@ -173,52 +173,52 @@ void loop() {
   // calcul cible
   float dc,Ddc, signe, zc;
   float Ez, DEz;
-
+  
   // reply only when you receive data:
   if (Serial.available() > 0) {
     // read the incoming byte:
-    incomingByte = Serial.read();
-    streamChar[i] = (char)incomingByte;
+    octetArrivant = Serial.read();
+    streamChar[i] = (char)octetArrivant;
     i++;
   }
 
-  if (incomingByte == 10){
-    incomingByte = 0;
+  if (octetArrivant == 10){
+    octetArrivant = 0;
     decryptIncom();
     i = 0;
-    loopCount = 10;
+    compteBoucle = 10;
   }
 
 
-  if( millis() - previousMillis >10){
-    previousMillis = millis();
+  if( millis() - millisPrecedente >10){
+    millisPrecedente = millis();
     // on fait le delta de chaque roue
-    dR = (float)(countR - prevCountR); // (float)(dc);
-    prevCountR = countR;
-    dL = (float)(countL - prevCountL); // (float)(dc);
-    prevCountL = countL;
-
+    dR = (float)(compteD - comptePrecD); // (float)(dc);
+    comptePrecD = compteD;
+    dL = (float)(compteG - comptePrecG); // (float)(dc);
+    comptePrecG = compteG;
+    
     // on fait le delta de distance et d'angle
-    dD = (dR/tickcmR+dL/tickcmL)/2;
-
-
+    dD = (dR/tickmmD+dL/tickmmG)/2;
+    
+    
     if(dR>0){
-      dR = dR/tickZR_P;
+      dR = dR/tickZD_P;
     }else{
-      dR = dR/tickZR_N;
+      dR = dR/tickZD_N;
     }
-
+    
     if(dL>0){
-      dL = dL/tickZL_P;
+      dL = dL/tickZG_P;
     }else{
-      dL = dL/tickZL_N;
+      dL = dL/tickZG_N;
     }
-
+    
     dZ = (dR -dL)/2;
 
     // on projete sur X et Y
     X += dD * cos(Z + dZ/2);
-    Y += dD * sin(Z + dZ/2);
+    Y -= dD * sin(Z + dZ/2);
 
     // on ajout a Z
     Z  += dZ;
@@ -229,20 +229,19 @@ void loop() {
     if(Z < -PI ){
       Z=Z+2*PI;
     }
-
     Serial.print(X);
-    Serial.print(":");
+    Serial.print(",");
     Serial.print(Y);
-    Serial.print(":");
+    Serial.print(",");
     Serial.print(Z*180/PI);
 
-    // Serial.print(countL);
-    // Serial.print(";");
-    // Serial.print(countR);
+    //Serial.print(compteG);
+    //Serial.print(";");
+    //Serial.print(compteD);
 
     // si non action de mouvement
     if (cmd==' ') {
-      //Serial.print(":1");
+      Serial.print(":1");
       // on envoie un stop
       sendCmd(0, 0);
     }
@@ -258,22 +257,22 @@ void loop() {
         Ddc = Kdp * dc + Kdi * Idc;
       }
 
-      cmdR  = (int)(Ddc*rankSpeed);
+      cmdD  = (int)(Ddc*rankSpeed);
 
       // on plafone a la vitesse de commande
-      if(cmdR>cmdSpeed) {
-        cmdR = cmdSpeed;
+      if(cmdD>cmdVitesse) {
+        cmdD = cmdVitesse;
       }
-      if(cmdR<-(cmdSpeed)) {
-        cmdR = -(cmdSpeed);
+      if(cmdD<-(cmdVitesse)) {
+        cmdD = -(cmdVitesse);
       }
-      cmdL = cmdR;
+      cmdG = cmdD;
 
       //On regarde si la cible est à gauche ou à droite du robot
       if(Y > Yt) {
-        signe = -1;
-      }else {
         signe = 1;
+      }else {
+        signe = -1;
       }
 
       //On calcule l'angle a la cible
@@ -288,14 +287,15 @@ void loop() {
       if(Ez < -PI ) {
         Ez=Ez+2*PI;
       }
-
+      //Serial.print(Ez);
+      //Serial.print(",");
       // si on part en marche arriere
       if(abs(dc) > precisionPos ) {
         // si la différence est >90, on part en marche arriere
         if(abs(Ez)>(PI/2)) {
-          cmdR  = -cmdR;
+          cmdD  = -cmdD;
           // cmdL  = -cmdL;
-          cmdL = cmdR;
+          cmdG = cmdD;
           // on retourne l'angle de cible pour rester en marche arriere
           if(Ez<0){
             Ez = Ez+PI;
@@ -304,7 +304,7 @@ void loop() {
           }
         }
       }
-
+      
       // calcul de correction d'angle a faire
       IEz += Ez;
       if (abs(Ez) > PI/20 ) {
@@ -313,33 +313,39 @@ void loop() {
       }else {
         DEz = Kap * Ez + Kai * IEz;
       }
-
+      
       // si on a un trop grand angle a faire, non transit
       if(abs(Ez) > PI/8 and cmd!='T') {
         // on ne fait que tourner
-        cmdR = (int)(DEz*cmdSpeed);
-        cmdL = (int)(-DEz*cmdSpeed);
+        cmdD = (int)(DEz*cmdVitesse);
+        cmdG = (int)(-DEz*cmdVitesse);
+        //Serial.print(" | ");
+        //Serial.print(" tourne ");
+        //Serial.print(" | ");
       }else {
-        cmdR += (int)(DEz*abs(cmdR));
-        cmdL -= (int)(DEz*abs(cmdL));
+        cmdD += (int)(DEz*abs(cmdD));
+        cmdG -= (int)(DEz*abs(cmdG)); 
+        //Serial.print(" | ");
+        //Serial.print(" avance + tourne ");
+        //Serial.print(" | ");  
       }
-
+      
       // on limite l'acceleration
-      if ((abs(cmdR)-abs(prevCmdR))>maxAcc) {
-        cmdR = prevCmdR+ maxAcc* (cmdR-prevCmdR)/ abs(cmdR-prevCmdR);
+      if ((abs(cmdD)-abs(cmdPrecD))>maxAcc) {
+        cmdD = cmdPrecD+ maxAcc* (cmdD-cmdPrecD)/ abs(cmdD-cmdPrecD);
       }
-      if ((abs(cmdL)-abs(prevCmdL))>maxAcc) {
-        cmdL = prevCmdL+ maxAcc* (cmdL-prevCmdL)/ abs(cmdL-prevCmdL);
+      if ((abs(cmdG)-abs(cmdPrecG))>maxAcc) {
+        cmdG = cmdPrecG+ maxAcc* (cmdG-cmdPrecG)/ abs(cmdG-cmdPrecG);
       }
-      prevCmdR = cmdR;
-      prevCmdL = cmdL;
-
+      cmdPrecD = cmdD;
+      cmdPrecG = cmdG;
+      
     //rotation
     }else if(cmd=='R') {
       dc=0;
-
-      cmdR = 0;
-      cmdL = 0;
+      
+      cmdD = 0;
+      cmdG = 0;
       Ez = Zt - Z;
       // si on est pret de l'arrive, on se tourne dans la bonne direction
       if(Ez > PI ) {
@@ -347,16 +353,16 @@ void loop() {
       }
       if(Ez < -PI ) {
         Ez=Ez+2*PI;
-      }
+      }                    
       // si on change de sens, on raz l'integrale pour éviter de surtourner
       if (Ez>0) {
-        if (rotSigne != 1) {
-          rotSigne = 1;
+        if (signeRot != 1) {
+          signeRot = 1;
           IEz=0;
         }
       }else {
-        if (rotSigne != -1) {
-          rotSigne = -1;
+        if (signeRot != -1) {
+          signeRot = -1;
           IEz=0;
         }
       }
@@ -368,57 +374,57 @@ void loop() {
       }else {
         DEz = KRap * Ez + KRai * IEz;
       }
-
-      cmdR = (int)(DEz*cmdSpeed);
-
-      if(cmdR>cmdSpeed) {
-        cmdR = cmdSpeed;
+      
+      cmdD = (int)(DEz*cmdVitesse);
+      
+      if(cmdD>cmdVitesse) {
+        cmdD = cmdVitesse;
       }
-      if(cmdR<-(cmdSpeed)) {
-        cmdR = -(cmdSpeed);
+      if(cmdD<-(cmdVitesse)) {
+        cmdD = -(cmdVitesse);
       }
-
-      cmdL = -cmdR;
-
-      if ((abs(cmdR)-abs(prevCmdR))>maxAcc) {
-        cmdR = prevCmdR+ maxAcc* (cmdR-prevCmdR)/ abs(cmdR-prevCmdR);
+      
+      cmdG = -cmdD;
+      
+      if ((abs(cmdD)-abs(cmdPrecD))>maxAcc) {
+        cmdD = cmdPrecD+ maxAcc* (cmdD-cmdPrecD)/ abs(cmdD-cmdPrecD);
       }
-      if ((abs(cmdL)-abs(prevCmdL))>maxAcc) {
-        cmdL = prevCmdL+ maxAcc* (cmdL-prevCmdL)/ abs(cmdL-prevCmdL);
+      if ((abs(cmdG)-abs(cmdPrecG))>maxAcc) {
+        cmdG = cmdPrecG+ maxAcc* (cmdG-cmdPrecG)/ abs(cmdG-cmdPrecG);
       }
-
+      
       // DEz - retard gauche
-      cmdR = cmdR + KL * (-dR - dL)*cmdSpeed;
+      cmdD = cmdD + KG * (-dR - dL)*cmdVitesse;
       // DEz + retard gauche
-      cmdL = cmdL + KL * (-dR - dL)*cmdSpeed;
-
-      prevCmdR = cmdR;
-      prevCmdL = cmdL;
+      cmdG = cmdG + KG * (-dR - dL)*cmdVitesse;
+      
+      cmdPrecD = cmdD;
+      cmdPrecG = cmdG;
     } else {
       IEz = 0;
       Idc = 0;
     }
     /* moteur R : 1 > 64 > 127
     moteur L : 128 > 192 > 255 */
-    if(cmdR>maxSpeed){
-      cmdR = maxSpeed;
-    } else if(cmdR<-maxSpeed){
-      cmdR = -maxSpeed;
+    if(cmdD>maxSpeed){
+      cmdD = maxSpeed;
+    } else if(cmdD<-maxSpeed){
+      cmdD = -maxSpeed;
     }
-    if(cmdL>maxSpeed){
-      cmdL = maxSpeed;
-    }else if(cmdL<-maxSpeed){
-      cmdL = -maxSpeed;
+    if(cmdG>maxSpeed){
+      cmdG = maxSpeed;
+    }else if(cmdG<-maxSpeed){
+      cmdG = -maxSpeed;
     }
 
     // vitesse minimal pour la phase d'approche
-    if (abs(cmdR) < minSpeed) cmdR = minSpeed* (cmdR)/ abs(cmdR);
-    if (abs(cmdL) < minSpeed) cmdL = minSpeed* (cmdL)/ abs(cmdL);
+    if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
+    if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
 
     Serial.print(":");
-
+        
     // si on est arrivé depuis assez longtemps
-    if (loopCount<=0){
+    if (compteBoucle<=0){
       cmd=' ';
       // on envoie un stop
       sendCmd(0, 0);
@@ -429,17 +435,17 @@ void loop() {
 
     // si on est proche du but, on continue et on réuit le compte
     }else if((abs(dc) < precisionPos*4 and (cmd=='G' or cmd=='T')) or ( cmd=='R' and  abs(Ez) < precisionZ*4 )){
-      loopCount-=1;
+      compteBoucle-=1;
 
       // on envoie les commande à la SB
-      sendCmd(cmdL, cmdR);
+      sendCmd(cmdG, cmdD);
       Serial.print("0");
 
     // si on n'est pas encore au but, on continue et on met le compte à 10
     }else{
-      loopCount=10;
+      compteBoucle=10;
       // on envoie les commande à la SB
-      sendCmd(cmdL, cmdR);
+      sendCmd(cmdG, cmdD);
       // Serial.print("(");
       // Serial.print(cmdL);
       // Serial.print(" | ");
@@ -466,20 +472,21 @@ void decryptIncom(){
         cmd = streamChar[0];
         i = 2;
         Xt = 0;
-
+        
         while (isDigit(streamChar[i])) {
             Xt = Xt * 10 + streamChar[i] - '0';
             i++;
         }
-
+    
         i++;
         Yt = 0;
         while (isDigit(streamChar[i])) {
             Yt = Yt * 10 + streamChar[i] - '0';
             i++;
         }
+        Serial.println(streamChar);
     }
-
+    
     // rotation à l'angle
     // R:zzz
     if (streamChar[0] == 'R') {
@@ -496,33 +503,36 @@ void decryptIncom(){
         }
         if (neg) Zt = -Zt;
         Zt = Zt*PI/180;
+        Serial.println(streamChar);
     }
-
+    
     // stop
     // 0
     if (streamChar[0] == '0') {
-        cmdSpeed = 0;
+        cmdVitesse = 0;
+        Serial.println(streamChar);
     }
-
+    
     // commande de vitesse
     // V:vvv
     if (streamChar[0] == 'V') {
-        cmdSpeed = 0;
+        cmdVitesse = 0;
         i = 2;
         while (isDigit(streamChar[i])) {
-            cmdSpeed = cmdSpeed * 10 + streamChar[i] - '0';
+            cmdVitesse = cmdVitesse * 10 + streamChar[i] - '0';
             i++;
         }
-        if(cmdSpeed>maxSpeed) cmdSpeed = maxSpeed;
+        if(cmdVitesse>maxSpeed) cmdVitesse = maxSpeed;
+        Serial.println(streamChar);
     }
-
+    
     // set de la position
     // S:xxx:yyy:zzz
     if (streamChar[0] == 'S') {
-        countR = 0;
-        countL = 0;
-        prevCountR = 0;
-        prevCountL = 0;
+        compteD = 0;
+        compteG = 0;
+        comptePrecD = 0;
+        comptePrecG = 0;
         i = 2;
         X = 0;
         while (isDigit(streamChar[i])) {
@@ -530,7 +540,9 @@ void decryptIncom(){
             i++;
         }
         Xt = X;
+
         i++;
+
         Y = 0;
         while (isDigit(streamChar[i])) {
             Y = Y * 10 + streamChar[i] - '0';
@@ -539,7 +551,7 @@ void decryptIncom(){
         Yt = Y;
 
         i++;
-
+          
         Z = 0;
         if (streamChar[i] == '-'){
             neg = true;
@@ -552,8 +564,10 @@ void decryptIncom(){
         if (neg) Z = -Z;
         Z = Z*PI/180;
         Zt = Z;
-    }
 
+        Serial.println(streamChar);
+    }
+    
     // set de la position sur X
     // X:xxx
     if (streamChar[0] == 'X') {
@@ -564,8 +578,10 @@ void decryptIncom(){
             i++;
         }
         Xt = X;
+        
+        Serial.println(streamChar);
     }
-
+    
     // set de la position sur Y
     // Y:yyy
     if (streamChar[0] == 'Y') {
@@ -576,8 +592,10 @@ void decryptIncom(){
             i++;
         }
         Yt = Y;
-    }
 
+        Serial.println(streamChar);
+    }
+    
     // set de la position sur Z
     // Z:zzz
     if (streamChar[0] == 'Z') {
@@ -594,69 +612,75 @@ void decryptIncom(){
         if (neg) Z = -Z;
         Z = Z*PI/180;
         Zt = Z;
+
+        Serial.println(streamChar);
     }
 }
 
 
-void interruptR()
+void interruptD()
 {
-  if (digitalRead(interruptPinRA) == digitalRead(interruptPinRB)) {
-    countR--;
+  if (digitalRead(interruptionPinDA) == digitalRead(interruptionPinDB)) {  
+    compteD--;
   }else{
-    countR++;
+    compteD++;
   }
 }
 
-void interruptL()
+void interruptG()
 {
-  if (digitalRead(interruptPinLA) == digitalRead(interruptPinLB)) {
-    countL++;
+  if (digitalRead(interruptionPinGA) == digitalRead(interruptionPinGB)) {  
+    compteG++;
   }else{
-    countL--;
+    compteG--;
   }
 }
 
 
 void sendCmd(int cmdG,int cmdD){
+  //Serial.print(cmdG);
+  //Serial.print(",");
+  //Serial.print(cmdD);
+  //Serial.println("");
 
   if (cmdD>0){
-    analogWrite25k(pinMotorRA, cmdD);
-    digitalWrite(pinMotorRB, LOW);
-    //digitalWrite(pinMotorRA,HIGH);
-    //digitalWrite(pinMotorRB,LOW);
+    analogWrite25k(moteurPinDA, cmdD);
+    digitalWrite(moteurPinDB, LOW);
+    //digitalWrite(moteurPinDA,HIGH);
+    //digitalWrite(moteurPinDB,LOW);
   }
   if (cmdG>0){
-    digitalWrite(pinMotorLA, LOW);
-    analogWrite25k(pinMotorLB, cmdG);
-    //digitalWrite(pinMotorLB,HIGH);
-    //digitalWrite(pinMotorLA,LOW);
+    digitalWrite(moteurPinGA, LOW);
+    analogWrite25k(moteurPinGB, cmdG);
+    //digitalWrite(moteurPinGA,HIGH);
+    //digitalWrite(moteurPinGB,LOW);
   }
 
   if(cmdD<0){
-    digitalWrite(pinMotorRA, LOW);
-    analogWrite25k(pinMotorRB, -cmdD);
-    //digitalWrite(pinMotorRA,LOW);
-    //digitalWrite(pinMotorRB,HIGH);
+    digitalWrite(moteurPinDA, LOW);
+    analogWrite25k(moteurPinDB, -cmdD);
+    //digitalWrite(moteurPinDA,LOW);
+    //digitalWrite(moteurPinDB,HIGH);
   }
   if (cmdG<0){
-    analogWrite25k(pinMotorLA, -cmdG);
-    digitalWrite(pinMotorLB, LOW);
-    //digitalWrite(pinMotorLB,LOW);
-    //digitalWrite(pinMotorLA,HIGH);
+    analogWrite25k(moteurPinGA, -cmdG);
+    digitalWrite(moteurPinGB, LOW);
+    //digitalWrite(moteurPinGB,LOW);
+    //digitalWrite(moteurPinGA,HIGH);
   }
 
   if(cmdD==0){
-    //analogWrite(pinMotorRA, 0);
-    //analogWrite(pinMotorRB, 0);
-    digitalWrite(pinMotorRA,LOW);
-    digitalWrite(pinMotorRB,LOW);
+    //analogWrite(moteurPinDA, 0);
+    //analogWrite(moteurPinDB, 0);
+    digitalWrite(moteurPinDA,LOW);
+    digitalWrite(moteurPinDB,LOW);
   }
 
   if(cmdG==0){
-    //analogWrite(pinMotorLA, 0);
-    //analogWrite(pinMotorLB, 0);
-    digitalWrite(pinMotorLB,LOW);
-    digitalWrite(pinMotorLA,LOW);
+    //analogWrite(moteurPinGA, 0);
+    //analogWrite(moteurPinGB, 0);
+    digitalWrite(moteurPinGB,LOW);
+    digitalWrite(moteurPinGA,LOW);  
   }
 
 }
