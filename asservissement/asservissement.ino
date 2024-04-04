@@ -16,28 +16,28 @@
 #define tickmmG 4.191
 
 //tick / rad horaire
-#define tickZD_N 641
-#define tickZG_P 628
+#define tickZD_N 636
+#define tickZG_P 635
 //tick / rad trigo
-#define tickZD_P 652
-#define tickZG_N 619
+#define tickZD_P 636
+#define tickZG_N 632
 
 // parametre K
-// rotation distance
-#define KRap 1.3
-#define KRai 0.4
-// rotation
-#define Kap 1
-#define Kai 0.2
 // distance
 #define Kdp 1
-#define Kdi 0
+#define Kdi 0.2
+// rotation distance
+#define Kap 2
+#define Kai 0.2
+// rotation
+#define KRap 2.4
+#define KRai 0.4
 
 // correction gauche
-#define KG 10
+#define KG 1
 
 // vitesse max
-#define maxSpeed 270
+#define maxSpeed 230
 #define minSpeed 70
 #define maxAcc 15
 
@@ -234,228 +234,235 @@ void loop() {
     Serial.print(Y);
     Serial.print(",");
     Serial.print(Z*180/PI);
-
-    //Serial.print(compteG);
-    //Serial.print(";");
-    //Serial.print(compteD);
+    Serial.print("(");
+    Serial.print(compteG);
+    Serial.print(";");
+    Serial.print(compteD);
+    Serial.print(")");
 
     // si non action de mouvement
     if (cmd==' ') {
       Serial.print(":1");
       // on envoie un stop
       sendCmd(0, 0);
-    }
-    //mouvement
-    if (cmd=='G' or cmd=='T') {
-      // distance à la cible
-      dc = sqrt((Xt-X)*(Xt-X)+(Yt-Y)*(Yt-Y));
-      Idc += dc;
-      if (abs(dc) > precisionPos ) {
-        Ddc = Kdp * dc;
-        Idc = 0;
-      }else {
-        Ddc = Kdp * dc + Kdi * Idc;
-      }
+    } else {
+      //mouvement
+      if (cmd=='G' or cmd=='T') {
+        // distance à la cible
+        dc = sqrt((Xt-X)*(Xt-X)+(Yt-Y)*(Yt-Y));
+        Idc += dc;
+        if (abs(dc) > precisionPos ) {
+          Ddc = Kdp * dc;
+          Idc = 0;
+        }else {
+          Ddc = Kdp * dc + Kdi * Idc;
+        }
 
-      cmdD  = (int)(Ddc*rankSpeed);
+        cmdD  = (int)(Ddc*rankSpeed);
 
-      // on plafone a la vitesse de commande
-      if(cmdD>cmdVitesse) {
-        cmdD = cmdVitesse;
-      }
-      if(cmdD<-(cmdVitesse)) {
-        cmdD = -(cmdVitesse);
-      }
-      cmdG = cmdD;
+        // on plafone a la vitesse de commande
+        if(cmdD>cmdVitesse) {
+          cmdD = cmdVitesse;
+        }
+        if(cmdD<-(cmdVitesse)) {
+          cmdD = -(cmdVitesse);
+        }
+        cmdG = cmdD;
 
-      //On regarde si la cible est à gauche ou à droite du robot
-      if(Y > Yt) {
-        signe = 1;
-      }else {
-        signe = -1;
-      }
+        //On regarde si la cible est à gauche ou à droite du robot
+        if(Y > Yt) {
+          signe = 1;
+        }else {
+          signe = -1;
+        }
 
-      //On calcule l'angle a la cible
-      zc = signe * acos((Xt-X)/dc);
+        //On calcule l'angle a la cible
+        zc = signe * acos((Xt-X)/dc);
 
-      // on calcul d'angle entre le robot et la cible
-      Ez = zc - Z;
+        // on calcul d'angle entre le robot et la cible
+        Ez = zc - Z;
 
-      if(Ez > PI ) {
-        Ez=Ez-2*PI;
-      }
-      if(Ez < -PI ) {
-        Ez=Ez+2*PI;
-      }
-      //Serial.print(Ez);
-      //Serial.print(",");
-      // si on part en marche arriere
-      if(abs(dc) > precisionPos ) {
-        // si la différence est >90, on part en marche arriere
-        if(abs(Ez)>(PI/2)) {
-          cmdD  = -cmdD;
-          // cmdL  = -cmdL;
-          cmdG = cmdD;
-          // on retourne l'angle de cible pour rester en marche arriere
-          if(Ez<0){
-            Ez = Ez+PI;
-          }else{
-            Ez = Ez-PI;
+        if(Ez > PI ) {
+          Ez=Ez-2*PI;
+        }
+        if(Ez < -PI ) {
+          Ez=Ez+2*PI;
+        }
+        //Serial.print(Ez);
+        //Serial.print(",");
+        // si on part en marche arriere
+        if(abs(dc) > precisionPos ) {
+          // si la différence est >90, on part en marche arriere
+          if(abs(Ez)>(PI/2)) {
+            cmdD  = -cmdD;
+            // cmdL  = -cmdL;
+            cmdG = cmdD;
+            // on retourne l'angle de cible pour rester en marche arriere
+            if(Ez<0){
+              Ez = Ez+PI;
+            }else{
+              Ez = Ez-PI;
+            }
           }
         }
-      }
-      
-      // calcul de correction d'angle a faire
-      IEz += Ez;
-      if (abs(Ez) > PI/20 ) {
-        DEz = Kap * Ez;
-        IEz = 0;
-      }else {
-        DEz = Kap * Ez + Kai * IEz;
-      }
-      
-      // si on a un trop grand angle a faire, non transit
-      if(abs(Ez) > PI/8 and cmd!='T') {
-        // on ne fait que tourner
-        cmdD = (int)(DEz*cmdVitesse);
-        cmdG = (int)(-DEz*cmdVitesse);
-        //Serial.print(" | ");
-        //Serial.print(" tourne ");
-        //Serial.print(" | ");
-      }else {
-        cmdD += (int)(DEz*abs(cmdD));
-        cmdG -= (int)(DEz*abs(cmdG)); 
-        //Serial.print(" | ");
-        //Serial.print(" avance + tourne ");
-        //Serial.print(" | ");  
-      }
-      
-      // on limite l'acceleration
-      if ((abs(cmdD)-abs(cmdPrecD))>maxAcc) {
-        cmdD = cmdPrecD+ maxAcc* (cmdD-cmdPrecD)/ abs(cmdD-cmdPrecD);
-      }
-      if ((abs(cmdG)-abs(cmdPrecG))>maxAcc) {
-        cmdG = cmdPrecG+ maxAcc* (cmdG-cmdPrecG)/ abs(cmdG-cmdPrecG);
-      }
-      cmdPrecD = cmdD;
-      cmdPrecG = cmdG;
-      
-    //rotation
-    }else if(cmd=='R') {
-      dc=0;
-      
-      cmdD = 0;
-      cmdG = 0;
-      Ez = Zt - Z;
-      // si on est pret de l'arrive, on se tourne dans la bonne direction
-      if(Ez > PI ) {
-        Ez=Ez-2*PI;
-      }
-      if(Ez < -PI ) {
-        Ez=Ez+2*PI;
-      }                    
-      // si on change de sens, on raz l'integrale pour éviter de surtourner
-      if (Ez>0) {
-        if (signeRot != 1) {
-          signeRot = 1;
-          IEz=0;
-        }
-      }else {
-        if (signeRot != -1) {
-          signeRot = -1;
-          IEz=0;
-        }
-      }
-      // calcul de correction d'angle a faire
-      IEz += Ez;
-      if (abs(Ez) > PI/20 ) {
-        DEz = KRap * Ez;
-        IEz = 0;
-      }else {
-        DEz = KRap * Ez + KRai * IEz;
-      }
-      
-      cmdD = (int)(DEz*cmdVitesse);
-      
-      if(cmdD>cmdVitesse) {
-        cmdD = cmdVitesse;
-      }
-      if(cmdD<-(cmdVitesse)) {
-        cmdD = -(cmdVitesse);
-      }
-      
-      cmdG = -cmdD;
-      
-      if ((abs(cmdD)-abs(cmdPrecD))>maxAcc) {
-        cmdD = cmdPrecD+ maxAcc* (cmdD-cmdPrecD)/ abs(cmdD-cmdPrecD);
-      }
-      if ((abs(cmdG)-abs(cmdPrecG))>maxAcc) {
-        cmdG = cmdPrecG+ maxAcc* (cmdG-cmdPrecG)/ abs(cmdG-cmdPrecG);
-      }
-      
-      // DEz - retard gauche
-      cmdD = cmdD + KG * (-dR - dL)*cmdVitesse;
-      // DEz + retard gauche
-      cmdG = cmdG + KG * (-dR - dL)*cmdVitesse;
-      
-      cmdPrecD = cmdD;
-      cmdPrecG = cmdG;
-    } else {
-      IEz = 0;
-      Idc = 0;
-    }
-    /* moteur R : 1 > 64 > 127
-    moteur L : 128 > 192 > 255 */
-    if(cmdD>maxSpeed){
-      cmdD = maxSpeed;
-    } else if(cmdD<-maxSpeed){
-      cmdD = -maxSpeed;
-    }
-    if(cmdG>maxSpeed){
-      cmdG = maxSpeed;
-    }else if(cmdG<-maxSpeed){
-      cmdG = -maxSpeed;
-    }
-
-    // vitesse minimal pour la phase d'approche
-    if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
-    if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
-
-    Serial.print(":");
         
-    // si on est arrivé depuis assez longtemps
-    if (compteBoucle<=0){
-      cmd=' ';
-      // on envoie un stop
-      sendCmd(0, 0);
-      // on raz l'integral
-      IEz = 0;
-      Idc = 0;
-      Serial.print("1");
+        // calcul de correction d'angle a faire
+        IEz += Ez;
+        // Angle superieur à 9 degrés
+        if (abs(Ez) > PI/20 ) {
+          DEz = Kap * Ez;
+          IEz = 0;
+        }else {
+          DEz = Kap * Ez + Kai * IEz;
+        }
+        
+        // si on a un trop grand angle a faire, non transit (22,5 degrés)
+        if(abs(Ez) > PI/8 and cmd!='T') {
+          // on ne fait que tourner
+          cmdD = (int)(DEz*cmdVitesse);
+          cmdG = (int)(-DEz*cmdVitesse);
+          //Serial.print(" | ");
+          //Serial.print(" tourne ");
+          //Serial.print(" | ");
+        }else {
+          cmdD += (int)(DEz*abs(cmdD));
+          cmdG -= (int)(DEz*abs(cmdG)); 
+          //Serial.print(" | ");
+          //Serial.print(" avance + tourne ");
+          //Serial.print(" | ");  
+        }
+        
+        // on limite l'acceleration
+        if ((abs(cmdD)-abs(cmdPrecD))>maxAcc) {
+          cmdD = cmdPrecD+ maxAcc* (cmdD-cmdPrecD)/ abs(cmdD-cmdPrecD);
+        }
+        if ((abs(cmdG)-abs(cmdPrecG))>maxAcc) {
+          cmdG = cmdPrecG+ maxAcc* (cmdG-cmdPrecG)/ abs(cmdG-cmdPrecG);
+        }
 
-    // si on est proche du but, on continue et on réuit le compte
-    }else if((abs(dc) < precisionPos*4 and (cmd=='G' or cmd=='T')) or ( cmd=='R' and  abs(Ez) < precisionZ*4 )){
-      compteBoucle-=1;
+        // DEz - retard gauche
+        //cmdD = cmdD - KG * (dR + dL)*cmdVitesse;
+        // DEz + retard gauche
+        //cmdG = cmdG + KG * (dR + dL)*cmdVitesse;
 
-      // on envoie les commande à la SB
-      sendCmd(cmdG, cmdD);
-      Serial.print("0");
+        cmdPrecD = cmdD;
+        cmdPrecG = cmdG;
+        
+      //rotation
+      }else if(cmd=='R') {
+        dc=0;
+        
+        cmdD = 0;
+        cmdG = 0;
+        Ez = Zt - Z;
+        // si on est pret de l'arrive, on se tourne dans la bonne direction
+        if(Ez > PI ) {
+          Ez=Ez-2*PI;
+        }
+        if(Ez < -PI ) {
+          Ez=Ez+2*PI;
+        }                    
+        // si on change de sens, on raz l'integrale pour éviter de surtourner
+        if (Ez>0) {
+          if (signeRot != 1) {
+            signeRot = 1;
+            IEz=0;
+          }
+        }else {
+          if (signeRot != -1) {
+            signeRot = -1;
+            IEz=0;
+          }
+        }
+        // calcul de correction d'angle a faire (9)
+        IEz += Ez;
+        if (abs(Ez) > PI/20 ) {
+          DEz = KRap * Ez;
+          IEz = 0;
+        }else {
+          Serial.print("'int:");
+          Serial.print(IEz);
+          Serial.print("'");
+          DEz = KRap * Ez + KRai * IEz;
+        }
+        
+        cmdD = (int)(DEz*cmdVitesse);
+        
+        if(cmdD>cmdVitesse) {
+          cmdD = cmdVitesse;
+        }
+        if(cmdD<-(cmdVitesse)) {
+          cmdD = -(cmdVitesse);
+        }
+        
+        cmdG = -cmdD;
+        
+        if ((abs(cmdD)-abs(cmdPrecD))>maxAcc) {
+          cmdD = cmdPrecD+ maxAcc* (cmdD-cmdPrecD)/ abs(cmdD-cmdPrecD);
+        }
+        if ((abs(cmdG)-abs(cmdPrecG))>maxAcc) {
+          cmdG = cmdPrecG+ maxAcc* (cmdG-cmdPrecG)/ abs(cmdG-cmdPrecG);
+        }
+        
+        // DEz - retard gauche
+        cmdD = cmdD + KG * (-dR - dL)*cmdVitesse;
+        // DEz + retard gauche
+        cmdG = cmdG + KG * (-dR - dL)*cmdVitesse;
+        
+        cmdPrecD = cmdD;
+        cmdPrecG = cmdG;
+      } else {
+        IEz = 0;
+        Idc = 0;
+      }
+      /* moteur R : 1 > 64 > 127
+      moteur L : 128 > 192 > 255 */
+      if(cmdD>maxSpeed){
+        cmdD = maxSpeed;
+      } else if(cmdD<-maxSpeed){
+        cmdD = -maxSpeed;
+      }
+      if(cmdG>maxSpeed){
+        cmdG = maxSpeed;
+      }else if(cmdG<-maxSpeed){
+        cmdG = -maxSpeed;
+      }
 
-    // si on n'est pas encore au but, on continue et on met le compte à 10
-    }else{
-      compteBoucle=10;
-      // on envoie les commande à la SB
-      sendCmd(cmdG, cmdD);
-      // Serial.print("(");
-      // Serial.print(cmdL);
-      // Serial.print(" | ");
-      // Serial.print(cmdR);
-      // Serial.print(")");
-      // transite on envoie le retour à 10 cm de la cible, avant de ralentir
-      if(abs(dc) < 10 and cmd=='T'){
+      // vitesse minimal pour la phase d'approche
+      if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
+      if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
+
+      Serial.print(":");
+          
+      // si on est arrivé depuis assez longtemps
+      if (compteBoucle<=0){
+        cmd=' ';
+        // on envoie un stop
+        sendCmd(0, 0);
+        // on raz l'integral
+        IEz = 0;
+        Idc = 0;
         Serial.print("1");
-      }else{
+
+      // si on est proche du but, on continue et on réuit le compte
+      }else if((abs(dc) < precisionPos*4 and (cmd=='G' or cmd=='T')) or ( cmd=='R' and  abs(Ez) < precisionZ*4 )){
+        compteBoucle-=1;
+
+        // on envoie les commande à la SB
+        sendCmd(cmdG, cmdD);
         Serial.print("0");
+
+      // si on n'est pas encore au but, on continue et on met le compte à 10
+      }else{
+        compteBoucle=10;
+        // on envoie les commande à la SB
+        sendCmd(cmdG, cmdD);
+        // transite on envoie le retour à 10 cm de la cible, avant de ralentir
+        if(abs(dc) < 10 and cmd=='T'){
+          Serial.print("1");
+        }else{
+          Serial.print("0");
+        }
       }
     }
     Serial.println("");
@@ -638,10 +645,11 @@ void interruptG()
 
 
 void sendCmd(int cmdG,int cmdD){
-  //Serial.print(cmdG);
-  //Serial.print(",");
-  //Serial.print(cmdD);
-  //Serial.println("");
+  Serial.print("|");
+  Serial.print(cmdG);
+  Serial.print(",");
+  Serial.print(cmdD);
+  Serial.print("|");
 
   if (cmdD>0){
     analogWrite25k(moteurPinDA, cmdD);
