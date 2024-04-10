@@ -27,8 +27,8 @@
 #define Kdp 1
 #define Kdi 0.2
 // rotation distance
-#define Kap 2
-#define Kai 0.2
+#define Kap 1.3
+#define Kai 0.005
 // rotation
 #define KRap 2.4
 #define KRai 0.4
@@ -37,7 +37,7 @@
 #define KG 1
 
 // vitesse max
-#define maxSpeed 230
+#define maxSpeed 300
 #define minSpeed 70
 #define maxAcc 15
 
@@ -66,7 +66,7 @@ const float rankSpeed = 15;
 float cmdVitesse;
 
 // precision de position a atteindre
-const float precisionPos = 5; //mm
+const float precisionPos = 3; //mm
 const float precisionZ = PI/360; //0.5 deg
 
 float IEz, Idc;
@@ -229,20 +229,15 @@ void loop() {
     if(Z < -PI ){
       Z=Z+2*PI;
     }
-    Serial.print(X);
-    Serial.print(",");
-    Serial.print(Y);
-    Serial.print(",");
-    Serial.print(Z*180/PI);
-    Serial.print("(");
-    Serial.print(compteG);
-    Serial.print(";");
-    Serial.print(compteD);
-    Serial.print(")");
 
     // si non action de mouvement
     if (cmd==' ') {
-      Serial.print(":1");
+      Serial.print(X);
+      Serial.print(",");
+      Serial.print(Y);
+      Serial.print(",");
+      Serial.println(Z*100);
+      //Serial.print(":1");
       // on envoie un stop
       sendCmd(0, 0);
     } else {
@@ -288,8 +283,6 @@ void loop() {
         if(Ez < -PI ) {
           Ez=Ez+2*PI;
         }
-        //Serial.print(Ez);
-        //Serial.print(",");
         // si on part en marche arriere
         if(abs(dc) > precisionPos ) {
           // si la différence est >90, on part en marche arriere
@@ -321,15 +314,9 @@ void loop() {
           // on ne fait que tourner
           cmdD = (int)(DEz*cmdVitesse);
           cmdG = (int)(-DEz*cmdVitesse);
-          //Serial.print(" | ");
-          //Serial.print(" tourne ");
-          //Serial.print(" | ");
         }else {
           cmdD += (int)(DEz*abs(cmdD));
           cmdG -= (int)(DEz*abs(cmdG)); 
-          //Serial.print(" | ");
-          //Serial.print(" avance + tourne ");
-          //Serial.print(" | ");  
         }
         
         // on limite l'acceleration
@@ -380,9 +367,6 @@ void loop() {
           DEz = KRap * Ez;
           IEz = 0;
         }else {
-          Serial.print("'int:");
-          Serial.print(IEz);
-          Serial.print("'");
           DEz = KRap * Ez + KRai * IEz;
         }
         
@@ -432,7 +416,7 @@ void loop() {
       if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
       if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
 
-      Serial.print(":");
+      //Serial.print(":");
           
       // si on est arrivé depuis assez longtemps
       if (compteBoucle<=0){
@@ -442,7 +426,12 @@ void loop() {
         // on raz l'integral
         IEz = 0;
         Idc = 0;
-        Serial.print("1");
+        Serial.print(X);
+        Serial.print(",");
+        Serial.print(Y);
+        Serial.print(",");
+        Serial.println(Z*100);
+        //Serial.print("1");
 
       // si on est proche du but, on continue et on réuit le compte
       }else if((abs(dc) < precisionPos*4 and (cmd=='G' or cmd=='T')) or ( cmd=='R' and  abs(Ez) < precisionZ*4 )){
@@ -450,7 +439,7 @@ void loop() {
 
         // on envoie les commande à la SB
         sendCmd(cmdG, cmdD);
-        Serial.print("0");
+        //Serial.print("0");
 
       // si on n'est pas encore au but, on continue et on met le compte à 10
       }else{
@@ -459,13 +448,18 @@ void loop() {
         sendCmd(cmdG, cmdD);
         // transite on envoie le retour à 10 cm de la cible, avant de ralentir
         if(abs(dc) < 10 and cmd=='T'){
-          Serial.print("1");
+              Serial.print(X);
+              Serial.print(",");
+              Serial.print(Y);
+              Serial.print(",");
+              Serial.println(Z*100);
+          //Serial.print("1");
         }else{
-          Serial.print("0");
+          //Serial.print("0");
         }
       }
     }
-    Serial.println("");
+    //Serial.println("");
   }
 }
 
@@ -622,6 +616,11 @@ void decryptIncom(){
 
         Serial.println(streamChar);
     }
+
+    // TODO : if p : pong
+    if (streamChar[0] == 'p') {
+      Serial.println("pong")
+    }
 }
 
 
@@ -645,11 +644,6 @@ void interruptG()
 
 
 void sendCmd(int cmdG,int cmdD){
-  Serial.print("|");
-  Serial.print(cmdG);
-  Serial.print(",");
-  Serial.print(cmdD);
-  Serial.print("|");
 
   if (cmdD>0){
     analogWrite25k(moteurPinDA, cmdD);
