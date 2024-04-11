@@ -145,7 +145,7 @@ void setup() {
           | _BV(CS40);   // prescaler = 1
   ICR4   = 320;         // TOP = 320
 
-  Serial.begin(115200);  //Init the Serial baudrate
+  Serial.begin(9600);  //Init the Serial baudrate
   
   pinMode(interruptionPinDA, INPUT_PULLUP);
   pinMode(interruptionPinDB, INPUT_PULLUP);
@@ -236,8 +236,8 @@ void loop() {
       Serial.print(",");
       Serial.print(Y);
       Serial.print(",");
-      Serial.println(Z*100);
-      //Serial.print(":1");
+      Serial.print(Z*100);
+      Serial.print(":1");
       // on envoie un stop
       sendCmd(0, 0);
     } else {
@@ -416,7 +416,7 @@ void loop() {
       if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
       if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
 
-      //Serial.print(":");
+      Serial.print(":");
           
       // si on est arrivé depuis assez longtemps
       if (compteBoucle<=0){
@@ -426,40 +426,30 @@ void loop() {
         // on raz l'integral
         IEz = 0;
         Idc = 0;
-        Serial.print(X);
-        Serial.print(",");
-        Serial.print(Y);
-        Serial.print(",");
-        Serial.println(Z*100);
-        //Serial.print("1");
+        Serial.print("1");
 
       // si on est proche du but, on continue et on réuit le compte
       }else if((abs(dc) < precisionPos*4 and (cmd=='G' or cmd=='T')) or ( cmd=='R' and  abs(Ez) < precisionZ*4 )){
         compteBoucle-=1;
 
-        // on envoie les commande à la SB
+        // on envoie les commande
         sendCmd(cmdG, cmdD);
-        //Serial.print("0");
+        Serial.print("0");
 
       // si on n'est pas encore au but, on continue et on met le compte à 10
       }else{
         compteBoucle=10;
-        // on envoie les commande à la SB
+        // on envoie les commande
         sendCmd(cmdG, cmdD);
         // transite on envoie le retour à 10 cm de la cible, avant de ralentir
         if(abs(dc) < 10 and cmd=='T'){
-              Serial.print(X);
-              Serial.print(",");
-              Serial.print(Y);
-              Serial.print(",");
-              Serial.println(Z*100);
-          //Serial.print("1");
+          Serial.print("1");
         }else{
-          //Serial.print("0");
+          Serial.print("0");
         }
       }
     }
-    //Serial.println("");
+    Serial.println("");
   }
 }
 
@@ -485,7 +475,6 @@ void decryptIncom(){
             Yt = Yt * 10 + streamChar[i] - '0';
             i++;
         }
-        Serial.println(streamChar);
     }
     
     // rotation à l'angle
@@ -503,15 +492,13 @@ void decryptIncom(){
             i++;
         }
         if (neg) Zt = -Zt;
-        Zt = Zt*PI/180;
-        Serial.println(streamChar);
+        Zt = Zt/100;
     }
     
     // stop
     // 0
     if (streamChar[0] == '0') {
         cmdVitesse = 0;
-        Serial.println(streamChar);
     }
     
     // commande de vitesse
@@ -524,7 +511,6 @@ void decryptIncom(){
             i++;
         }
         if(cmdVitesse>maxSpeed) cmdVitesse = maxSpeed;
-        Serial.println(streamChar);
     }
     
     // set de la position
@@ -563,10 +549,8 @@ void decryptIncom(){
             i++;
         }
         if (neg) Z = -Z;
-        Z = Z*PI/180;
+        Z = Z/100;
         Zt = Z;
-
-        Serial.println(streamChar);
     }
     
     // set de la position sur X
@@ -579,8 +563,6 @@ void decryptIncom(){
             i++;
         }
         Xt = X;
-        
-        Serial.println(streamChar);
     }
     
     // set de la position sur Y
@@ -593,8 +575,6 @@ void decryptIncom(){
             i++;
         }
         Yt = Y;
-
-        Serial.println(streamChar);
     }
     
     // set de la position sur Z
@@ -611,15 +591,17 @@ void decryptIncom(){
             i++;
         }
         if (neg) Z = -Z;
-        Z = Z*PI/180;
+        Z = Z/100;
         Zt = Z;
-
-        Serial.println(streamChar);
     }
 
     // TODO : if p : pong
     if (streamChar[0] == 'p') {
-      Serial.println("pong")
+      Serial.println("pong");
+      Serial.println("pong");
+      Serial.println("pong");
+      Serial.println("pong");
+      Serial.println("pong");
     }
 }
 
