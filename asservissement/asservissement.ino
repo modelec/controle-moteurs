@@ -243,6 +243,11 @@ void loop() {
     } else {
       //mouvement
       if (cmd=='G' or cmd=='T') {
+        Serial.print(X);
+        Serial.print(",");
+        Serial.print(Y);
+        Serial.print(",");
+        Serial.print(Z*100);
         // distance à la cible
         dc = sqrt((Xt-X)*(Xt-X)+(Yt-Y)*(Yt-Y));
         Idc += dc;
@@ -337,6 +342,11 @@ void loop() {
         
       //rotation
       }else if(cmd=='R') {
+        Serial.print(X);
+        Serial.print(",");
+        Serial.print(Y);
+        Serial.print(",");
+        Serial.print(Z*100);
         dc=0;
         
         cmdD = 0;
