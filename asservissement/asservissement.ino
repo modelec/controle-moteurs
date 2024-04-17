@@ -456,7 +456,7 @@ void loop() {
         // on envoie les commande
         sendCmd(cmdG, cmdD);
         // transite on envoie le retour à 10 cm de la cible, avant de ralentir
-        if(abs(dc) < 10 and cmd=='T'){
+        if(abs(dc) < 50 and cmd=='T'){
           Serial.print("2");
         }else{
           Serial.print("0");
