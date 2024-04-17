@@ -24,8 +24,8 @@
 
 // parametre K
 // distance
-#define Kdp 1
-#define Kdi 0.2
+#define Kdp 0.5
+#define Kdi 0.01
 // rotation distance
 #define Kap 1.3
 #define Kai 0.005
@@ -37,9 +37,10 @@
 #define KG 1
 
 // vitesse max
-#define maxSpeed 300
+#define maxSpeed 250
 #define minSpeed 70
 #define maxAcc 15
+#define minSpeedPasInt 120
 
 // String streamChar;
 char streamChar[32] ;
@@ -66,7 +67,7 @@ const float rankSpeed = 15;
 float cmdVitesse;
 
 // precision de position a atteindre
-const float precisionPos = 3; //mm
+const float precisionPos = 8; //mm
 const float precisionZ = PI/360; //0.5 deg
 
 float IEz, Idc;
@@ -241,13 +242,13 @@ void loop() {
       // on envoie un stop
       sendCmd(0, 0);
     } else {
+      Serial.print(X);
+      Serial.print(",");
+      Serial.print(Y);
+      Serial.print(",");
+      Serial.print(Z*100);
       //mouvement
       if (cmd=='G' or cmd=='T') {
-        Serial.print(X);
-        Serial.print(",");
-        Serial.print(Y);
-        Serial.print(",");
-        Serial.print(Z*100);
         // distance à la cible
         dc = sqrt((Xt-X)*(Xt-X)+(Yt-Y)*(Yt-Y));
         Idc += dc;
@@ -342,11 +343,6 @@ void loop() {
         
       //rotation
       }else if(cmd=='R') {
-        Serial.print(X);
-        Serial.print(",");
-        Serial.print(Y);
-        Serial.print(",");
-        Serial.print(Z*100);
         dc=0;
         
         cmdD = 0;
@@ -421,10 +417,18 @@ void loop() {
       }else if(cmdG<-maxSpeed){
         cmdG = -maxSpeed;
       }
-
-      // vitesse minimal pour la phase d'approche
-      if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
-      if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
+      
+      if ((abs(Ez) > PI/20) || (abs(dc) > precisionPos) ) {
+        // vitesse minimal si pas d'intégrale (peut marcher meme si moteur initialement etein)
+        if (abs(cmdD) < minSpeed) cmdD = minSpeedPasInt* (cmdD)/ abs(cmdD);
+        if (abs(cmdG) < minSpeed) cmdG = minSpeedPasInt* (cmdG)/ abs(cmdG);
+      } else {
+        // vitesse minimal pour la phase d'approche
+        if (abs(cmdD) < minSpeed) cmdD = minSpeed* (cmdD)/ abs(cmdD);
+        if (abs(cmdG) < minSpeed) cmdG = minSpeed* (cmdG)/ abs(cmdG);
+      }
+      
+      
 
       Serial.print(":");
           
