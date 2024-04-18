@@ -30,7 +30,7 @@
 #define Kap 1.3
 #define Kai 0.005
 // rotation
-#define KRap 2.4
+#define KRap 2.8
 #define KRai 0.4
 
 // correction gauche
