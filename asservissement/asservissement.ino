@@ -146,7 +146,7 @@ void setup() {
           | _BV(CS40);   // prescaler = 1
   ICR4   = 320;         // TOP = 320
 
-  Serial.begin(9600);  //Init the Serial baudrate
+  Serial.begin(115200);  //Init the Serial baudrate
   
   pinMode(interruptionPinDA, INPUT_PULLUP);
   pinMode(interruptionPinDB, INPUT_PULLUP);
@@ -230,23 +230,83 @@ void loop() {
     if(Z < -PI ){
       Z=Z+2*PI;
     }
-
+    Serial.print(X);
+    Serial.print(",");
+    Serial.print(Y);
+    Serial.print(",");
+    Serial.print(Z*100);
     // si non action de mouvement
     if (cmd==' ') {
-      Serial.print(X);
-      Serial.print(",");
-      Serial.print(Y);
-      Serial.print(",");
-      Serial.print(Z*100);
       Serial.print(":1");
       // on envoie un stop
       sendCmd(0, 0);
+    } else if (cmd=='C' or cmd=='F'){
+      if (cmd=='C'){
+        if (goBack) {
+          cmdD = -150;
+          cmdG = -150;
+        }else{
+          cmdD = 150;
+          cmdG = 150;
+        }
+      }else{
+        if (goBack) {
+          cmdD = -200;
+          cmdG = -200;
+        }else{
+          cmdD = 200;
+          cmdG = 200;
+        }
+      }
+      
+      // on calcul d'angle entre le robot et la cible
+      Ez = Zt - Z;
+      
+      if(cmd=='C' and (dR==0 or dL==0)) Ez = 0; 
+      // si on change de sens, on raz l'integrale pour éviter de surtourner
+      if (Ez>0){
+        if (signeRot != 1){
+          signeRot = 1;
+          IEz=0;
+        }
+      }else{
+        if (signeRot != -1){
+          signeRot = -1;
+          IEz=0;
+        }
+      }
+
+      // calcul de correction d'angle a faire
+      IEz += Ez;    
+      DEz = Kap * Ez + Kai * IEz;
+      cmdD += (int)(DEz*cmdVitesse);
+      cmdG -= (int)(DEz*cmdVitesse);
+
+      // si les roue ne bouge plus, on est contre le bors de la table
+      if(dR==0 and dL==0){
+        if (compteBoucle==0){
+          // on envoie un stop
+          sendCmd(0, 0);
+          Serial.print(":1");
+          // on évite de nouveau déplacement
+          cmd=' ';
+          compteD = 0;
+          compteG = 0;
+          IEz=0;
+          comptePrecD = 0;
+          comptePrecG = 0;
+        }else{
+          Serial.print(":0");
+          compteBoucle--;
+          sendCmd(cmdG, cmdD);
+        }
+      }else{
+        // on envoie les commande
+        Serial.print(":0");
+        sendCmd(cmdG, cmdD);
+        compteBoucle = 10;
+      }
     } else {
-      Serial.print(X);
-      Serial.print(",");
-      Serial.print(Y);
-      Serial.print(",");
-      Serial.print(Z*100);
       //mouvement
       if (cmd=='G' or cmd=='T') {
         // distance à la cible
@@ -470,153 +530,161 @@ void loop() {
 void decryptIncom(){
   bool neg;
   i = 0;
+  // recallage
+  // C:+/-
+  // F:+/-
+  if (streamChar[0] == 'C' or streamChar[0]=='F' ) {
+    goBack = !(streamChar[2] == '+');
+    cmd = streamChar[0];
+    Zt = Z;
+  }
   // goto destination ou transite destination
-    // G:xxx:yyy
-    // T:xxx:yyy
-    if (streamChar[0] == 'G' or streamChar[0]=='T') {
-        cmd = streamChar[0];
-        i = 2;
-        Xt = 0;
-        
-        while (isDigit(streamChar[i])) {
-            Xt = Xt * 10 + streamChar[i] - '0';
-            i++;
-        }
+  // G:xxx:yyy
+  // T:xxx:yyy
+  if (streamChar[0] == 'G' or streamChar[0]=='T') {
+    cmd = streamChar[0];
+    i = 2;
+    Xt = 0;
     
-        i++;
-        Yt = 0;
-        while (isDigit(streamChar[i])) {
-            Yt = Yt * 10 + streamChar[i] - '0';
-            i++;
-        }
-    }
-    
-    // rotation à l'angle
-    // R:zzz
-    if (streamChar[0] == 'R') {
-        cmd = streamChar[0];
-        i = 2;
-        Zt = 0;
-        if (streamChar[i] == '-'){
-            neg = true;
-            i++;
-        }else neg = false;
-        while (isDigit(streamChar[i])) {
-            Zt = Zt * 10 + streamChar[i] - '0';
-            i++;
-        }
-        if (neg) Zt = -Zt;
-        Zt = Zt/100;
-    }
-    
-    // stop
-    // 0
-    if (streamChar[0] == '0') {
-        cmdVitesse = 0;
-    }
-    
-    // commande de vitesse
-    // V:vvv
-    if (streamChar[0] == 'V') {
-        cmdVitesse = 0;
-        i = 2;
-        while (isDigit(streamChar[i])) {
-            cmdVitesse = cmdVitesse * 10 + streamChar[i] - '0';
-            i++;
-        }
-        if(cmdVitesse>maxSpeed) cmdVitesse = maxSpeed;
-    }
-    
-    // set de la position
-    // S:xxx:yyy:zzz
-    if (streamChar[0] == 'S') {
-        compteD = 0;
-        compteG = 0;
-        comptePrecD = 0;
-        comptePrecG = 0;
-        i = 2;
-        X = 0;
-        while (isDigit(streamChar[i])) {
-            X = X * 10 + streamChar[i] - '0';
-            i++;
-        }
-        Xt = X;
-
-        i++;
-
-        Y = 0;
-        while (isDigit(streamChar[i])) {
-            Y = Y * 10 + streamChar[i] - '0';
-            i++;
-        }
-        Yt = Y;
-
-        i++;
-          
-        Z = 0;
-        if (streamChar[i] == '-'){
-            neg = true;
-            i++;
-        }else neg = false;
-        while (isDigit(streamChar[i])) {
-            Z = Z * 10 + streamChar[i] - '0';
-            i++;
-        }
-        if (neg) Z = -Z;
-        Z = Z/100;
-        Zt = Z;
-    }
-    
-    // set de la position sur X
-    // X:xxx
-    if (streamChar[0] == 'X') {
-        i = 2;
-        X = 0;
-        while (isDigit(streamChar[i])) {
-            X = X * 10 + streamChar[i] - '0';
-            i++;
-        }
-        Xt = X;
-    }
-    
-    // set de la position sur Y
-    // Y:yyy
-    if (streamChar[0] == 'Y') {
-        i = 2;
-        Y = 0;
-        while (isDigit(streamChar[i])) {
-            Y = Y * 10 + streamChar[i] - '0';
-            i++;
-        }
-        Yt = Y;
-    }
-    
-    // set de la position sur Z
-    // Z:zzz
-    if (streamChar[0] == 'Z') {
-        i = 2;
-        Z = 0;
-        if (streamChar[i] == '-'){
-            neg = true;
-            i++;
-        }else neg = false;
-        while (isDigit(streamChar[i])) {
-            Z = Z * 10 + streamChar[i] - '0';
-            i++;
-        }
-        if (neg) Z = -Z;
-        Z = Z/100;
-        Zt = Z;
+    while (isDigit(streamChar[i])) {
+      Xt = Xt * 10 + streamChar[i] - '0';
+      i++;
     }
 
-    // TODO : if p : pong
-    if (streamChar[0] == 'p') {
-      Serial.println("pong");
-      Serial.println("pong");
-      Serial.println("pong");
-      Serial.println("pong");
-      Serial.println("pong");
+    i++;
+    Yt = 0;
+    while (isDigit(streamChar[i])) {
+      Yt = Yt * 10 + streamChar[i] - '0';
+      i++;
     }
+  }
+  
+  // rotation à l'angle
+  // R:zzz
+  if (streamChar[0] == 'R') {
+    cmd = streamChar[0];
+    i = 2;
+    Zt = 0;
+    if (streamChar[i] == '-'){
+      neg = true;
+      i++;
+    }else neg = false;
+    while (isDigit(streamChar[i])) {
+      Zt = Zt * 10 + streamChar[i] - '0';
+      i++;
+    }
+    if (neg) Zt = -Zt;
+    Zt = Zt/100;
+  }
+  
+  // stop
+  // 0
+  if (streamChar[0] == '0') {
+    cmdVitesse = 0;
+  }
+  
+  // commande de vitesse
+  // V:vvv
+  if (streamChar[0] == 'V') {
+    cmdVitesse = 0;
+    i = 2;
+    while (isDigit(streamChar[i])) {
+      cmdVitesse = cmdVitesse * 10 + streamChar[i] - '0';
+      i++;
+    }
+    if(cmdVitesse>maxSpeed) cmdVitesse = maxSpeed;
+  }
+  
+  // set de la position
+  // S:xxx:yyy:zzz
+  if (streamChar[0] == 'S') {
+    compteD = 0;
+    compteG = 0;
+    comptePrecD = 0;
+    comptePrecG = 0;
+    i = 2;
+    X = 0;
+    while (isDigit(streamChar[i])) {
+      X = X * 10 + streamChar[i] - '0';
+      i++;
+    }
+    Xt = X;
+
+    i++;
+
+    Y = 0;
+    while (isDigit(streamChar[i])) {
+      Y = Y * 10 + streamChar[i] - '0';
+      i++;
+    }
+    Yt = Y;
+
+    i++;
+      
+    Z = 0;
+    if (streamChar[i] == '-'){
+      neg = true;
+      i++;
+    }else neg = false;
+    while (isDigit(streamChar[i])) {
+      Z = Z * 10 + streamChar[i] - '0';
+      i++;
+    }
+    if (neg) Z = -Z;
+    Z = Z/100;
+    Zt = Z;
+  }
+  
+  // set de la position sur X
+  // X:xxx
+  if (streamChar[0] == 'X') {
+    i = 2;
+    X = 0;
+    while (isDigit(streamChar[i])) {
+      X = X * 10 + streamChar[i] - '0';
+      i++;
+    }
+    Xt = X;
+  }
+  
+  // set de la position sur Y
+  // Y:yyy
+  if (streamChar[0] == 'Y') {
+    i = 2;
+    Y = 0;
+    while (isDigit(streamChar[i])) {
+      Y = Y * 10 + streamChar[i] - '0';
+      i++;
+    }
+    Yt = Y;
+  }
+  
+  // set de la position sur Z
+  // Z:zzz
+  if (streamChar[0] == 'Z') {
+    i = 2;
+    Z = 0;
+    if (streamChar[i] == '-'){
+      neg = true;
+      i++;
+    }else neg = false;
+    while (isDigit(streamChar[i])) {
+      Z = Z * 10 + streamChar[i] - '0';
+      i++;
+    }
+    if (neg) Z = -Z;
+    Z = Z/100;
+    Zt = Z;
+  }
+
+  // if p : pong
+  if (streamChar[0] == 'p') {
+    Serial.println("pong");
+    Serial.println("pong");
+    Serial.println("pong");
+    Serial.println("pong");
+    Serial.println("pong");
+  }
 }
 
 
