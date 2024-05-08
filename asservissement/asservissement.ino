@@ -536,8 +536,8 @@ void decryptIncom(){
   bool neg;
   i = 0;
   // stop
-  if (streamChar[0]==' ') {
-    cmd = streamChar[0];
+  if (streamChar[0]=='W') {
+    cmd = ' ';
   }
 
   // recallage
