@@ -16,10 +16,10 @@
 #define tickmmG 4.191
 
 //tick / rad horaire
-#define tickZD_N 636
-#define tickZG_P 635
+#define tickZD_N 633
+#define tickZG_P 638
 //tick / rad trigo
-#define tickZD_P 636
+#define tickZD_P 637
 #define tickZG_N 632
 
 // parametre K
@@ -235,6 +235,11 @@ void loop() {
     Serial.print(Y);
     Serial.print(",");
     Serial.print(Z*100);
+    //Serial.print("(");
+    //Serial.print(compteG);
+    //Serial.print("|");
+    //Serial.print(compteD);
+    //Serial.print(")");
     // si non action de mouvement
     if (cmd==' ') {
       Serial.print(":1");
@@ -516,7 +521,7 @@ void loop() {
         // on envoie les commande
         sendCmd(cmdG, cmdD);
         // transite on envoie le retour à 10 cm de la cible, avant de ralentir
-        if(abs(dc) < 50 and cmd=='T'){
+        if(abs(dc) < 250 and cmd=='T'){
           Serial.print("2");
         }else{
           Serial.print("0");
@@ -530,6 +535,11 @@ void loop() {
 void decryptIncom(){
   bool neg;
   i = 0;
+  // stop
+  if (streamChar[0]==' ') {
+    cmd = streamChar[0];
+  }
+
   // recallage
   // C:+/-
   // F:+/-
@@ -581,6 +591,7 @@ void decryptIncom(){
   // 0
   if (streamChar[0] == '0') {
     cmdVitesse = 0;
+
   }
   
   // commande de vitesse
