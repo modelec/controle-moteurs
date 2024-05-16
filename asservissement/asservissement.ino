@@ -188,23 +188,11 @@ void loop() {
       }
 
       dZ = (dR -dL)/2*10;
-      // TODO : Rajouter coef en fonction de la vitesse pour le reducteur
-      /*int t = (vitesse != 0) ? abs(vitesse) / vitesse : 0;
-      if (dZ > 0) {
-          if (abs(reducG) > 0) reducG -= t;
-          else reducD += t;
-      }
-      if (dZ < 0) {
-          if (abs(reducD) > 0) reducD -= t;
-          else reducG += t;
-      }
-      cmdG = vitesse - reducG;
-      cmdD = vitesse - reducD;*/
       cmdD = vitesse;
       cmdG = vitesse;
 
       if (angle != 0) {
-        float ratio = abs(angle) / 157;
+        float ratio = map(abs(angle) / 157, 0, 1, 0, 0.6);
         if (angle > 0) {
           cmdD *= (1-ratio);
         }
@@ -213,7 +201,6 @@ void loop() {
         }
       }
       if (vitesseRotation != 0) {
-        // TODO : Rajouter coef en fonction de la vitesse pour le reducteur
         cmdG = vitesseRotation;
         cmdD = -vitesseRotation;
       }
@@ -260,12 +247,6 @@ void decryptIncom() {
     }
 
     if (neg) vitesse = -vitesse;
-
-    /*if (previousSigneVitesse != abs(vitesse)/vitesse) {
-      previousSigneVitesse != previousSigneVitesse;
-      reducD = -reducD;
-      reducG = -reducG;
-    }*/
   }
   if (streamChar[0] == 'R') {
     cmd = streamChar[0];
@@ -323,39 +304,27 @@ void sendCmd(int cmdG,int cmdD) {
   if (cmdD>0){
     analogWrite25k(moteurPinDA, cmdD);
     digitalWrite(moteurPinDB, LOW);
-    //digitalWrite(moteurPinDA,HIGH);
-    //digitalWrite(moteurPinDB,LOW);
   }
   if (cmdG>0){
     digitalWrite(moteurPinGA, LOW);
     analogWrite25k(moteurPinGB, cmdG);
-    //digitalWrite(moteurPinGA,HIGH);
-    //digitalWrite(moteurPinGB,LOW);
   }
 
   if(cmdD<0){
     digitalWrite(moteurPinDA, LOW);
     analogWrite25k(moteurPinDB, -cmdD);
-    //digitalWrite(moteurPinDA,LOW);
-    //digitalWrite(moteurPinDB,HIGH);
   }
   if (cmdG<0){
     analogWrite25k(moteurPinGA, -cmdG);
     digitalWrite(moteurPinGB, LOW);
-    //digitalWrite(moteurPinGB,LOW);
-    //digitalWrite(moteurPinGA,HIGH);
   }
 
   if(cmdD==0){
-    //analogWrite(moteurPinDA, 0);
-    //analogWrite(moteurPinDB, 0);
     digitalWrite(moteurPinDA,LOW);
     digitalWrite(moteurPinDB,LOW);
   }
 
   if(cmdG==0){
-    //analogWrite(moteurPinGA, 0);
-    //analogWrite(moteurPinGB, 0);
     digitalWrite(moteurPinGB,LOW);
     digitalWrite(moteurPinGA,LOW);  
   }
