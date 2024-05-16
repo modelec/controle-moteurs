@@ -1,3 +1,1 @@
-Via le serial
-- Distance : `d distanceEnCm` exemple : `d 100`
-- Rotation : `r rotationEnDegree` exemple : `r 90` 
+Controle des moteur à l'aide des commandes d'une manette convertie et transmit par un raspberry pi en Serial.
